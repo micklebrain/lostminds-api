@@ -1,14 +1,58 @@
-const http = require('http');
+const express = require('express')
+const app = express()
+const port = 3000
 
-const hostname = '127.0.0.1';
-const port = 3000;
+app.get('/', (req, res) => {
+  res.send('Hello World!')
+})
 
-const server = http.createServer((req, res) => {
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'text/plain');
-  res.end('Hello World');
-});
+app.get('/api', (req, res) => {
+        // Import Dependencies
+    const url = require('url')
+    const MongoClient = require('mongodb').MongoClient
 
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}/`);
-});
+    // Create cached connection variable
+    let cachedDb = null
+
+    // A function for connecting to MongoDB,
+    // taking a single parameter of the connection string
+    async function connectToDatabase(uri) {
+    // If the database connection is cached,
+    // use it instead of creating a new connection
+    if (cachedDb) {
+        return cachedDb
+    }
+
+    // If no connection is cached, create a new one
+    const client = await MongoClient.connect(uri, { useNewUrlParser: true })
+
+    // Select the database through the connection,
+    // using the database path of the connection string
+    const db = await client.db(url.parse(uri).pathname.substr(1))
+
+    // Cache the database connection and return the connection
+    cachedDb = db
+    return db
+    }
+
+    // The main, exported, function of the endpoint,
+    // dealing with the request and subsequent response
+    module.exports = async (req, res) => {
+    // Get a database connection, cached or otherwise,
+    // using the connection string environment variable as the argument
+    const db = await connectToDatabase(process.env.MONGODB_URI)
+
+    // Select the "users" collection from the database
+    const collection = await db.collection('users')
+
+    // Select the users collection from the database
+    const users = await collection.find({}).toArray()
+
+    // Respond with a JSON string of all users in the collection
+    res.status(200).json({ users })
+    }
+})
+
+app.listen(port, () => {
+  console.log(`Example app listening at http://localhost:${port}`)
+})
